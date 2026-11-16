@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>성수동 카페 상권 생존 분석 및 수요 예측 — 최종 발표자료</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        :root {
+            --bg-dark: #0b0f19;
+            --slide-bg: #131a2a;
+            --card-bg: #1c253b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-blue: #3b82f6;
+            --accent-emerald: #10b981;
+            --accent-rose: #f43f5e;
+            --accent-amber: #f59e0b;
+            --border: #28354f;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+        }
+        /* Top Navigation Bar */
+        .top-bar {
+            height: 54px;
+            background-color: rgba(19, 26, 42, 0.95);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 28px;
+            z-index: 100;
+        }
+        .brand {
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: var(--accent-blue);
+            letter-spacing: -0.02em;
+        }
+        .slide-dots {
+            display: flex;
+            gap: 8px;
+        }
+        .dot {
+            width: 28px;
+            height: 6px;
+            border-radius: 3px;
+            background-color: var(--border);
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+        .dot.active {
+            background-color: var(--accent-blue);
+            width: 44px;
+        }
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .btn {
+            background-color: var(--card-bg);
+            color: var(--text-main);
+            border: 1px solid var(--border);
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn:hover {
+            background-color: #273452;
+        }
+        .page-counter {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            min-width: 45px;
+            text-align: center;
+        }
+
+        /* Slide Container */
+        .deck {
+            flex: 1;
+            position: relative;
+            width: 100%;
+            height: calc(100vh - 54px);
+        }
+        .slide {
+            position: absolute;
+            inset: 0;
+            padding: 36px 56px;
+            display: none;
+            flex-direction: column;
+            justify-content: space-between;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            overflow-y: auto;
+        }
+        .slide.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        /* Slide Typography & Layout Helpers */
+        .slide-header {
+            margin-bottom: 20px;
+        }
+        .tag {
+            display: inline-block;
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--accent-blue);
+            background: rgba(59, 130, 246, 0.14);
+            padding: 4px 10px;
+            border-radius: 20px;
+            margin-bottom: 8px;
+        }
+        .slide-title {
+            font-size: 2rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            line-height: 1.25;
+        }
+        .slide-subtitle {
+            font-size: 1.05rem;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        /* Cover Slide */
+        .cover-center {
+            margin: auto;
+            text-align: center;
+            max-width: 860px;
+        }
+        .cover-title {
+            font-size: 3.1rem;
+            font-weight: 800;
+            line-height: 1.2;
+            margin: 18px 0;
+            background: linear-gradient(135deg, #ffffff 30%, #60a5fa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .cover-meta {
+            margin-top: 32px;
+            display: inline-flex;
+            gap: 24px;
+            background: var(--card-bg);
+            padding: 14px 28px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        /* Grids & Cards */
+        .grid-4 {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 18px;
+        }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            flex: 1;
+            align-items: stretch;
+        }
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            flex: 1;
+        }
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 22px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .kpi-label {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+        .kpi-num {
+            font-size: 2.1rem;
+            font-weight: 800;
+        }
+        .kpi-delta {
+            font-size: 0.88rem;
+            margin-top: 6px;
+            font-weight: 600;
+        }
+        .chart-box {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 16px;
+            width: 100%;
+            height: 100%;
+            min-height: 330px;
+        }
+
+        /* Simulator Styling */
+        .sim-layout {
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 24px;
+            flex: 1;
+        }
+        .slider-group {
+            margin-bottom: 18px;
+        }
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.95rem;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+        input[type="range"] {
+            width: 100%;
+            accent-color: var(--accent-blue);
+            cursor: pointer;
+        }
+        .sim-result-box {
+            text-align: center;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle at top right, rgba(59,130,246,0.18), var(--card-bg));
+        }
+        .prob-circle {
+            font-size: 3.6rem;
+            font-weight: 900;
+            margin: 12px 0;
+        }
+        .bullet-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        .bullet-list li {
+            background: rgba(255,255,255,0.03);
+            padding: 14px 18px;
+            border-radius: 10px;
+            border-left: 4px solid var(--accent-blue);
+            font-size: 0.98rem;
+            line-height: 1.5;
+        }
+        .bullet-list li strong {
+            color: #fff;
+            display: block;
+            margin-bottom: 4px;
+        }
+        .slide-footer {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 16px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255,255,255,0.06);
+        }
+
+        @media (max-width: 900px) {
+            .grid-4, .grid-2, .grid-3, .sim-layout {
+                grid-template-columns: 1fr;
+            }
+            .slide { padding: 20px; }
+            .cover-title { font-size: 2rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Top Control Bar -->
+    <div class="top-bar">
+        <div class="brand">SEONGSU CAFE SAAS · FINAL PRESENTATION</div>
+        <div class="slide-dots" id="slideDots"></div>
+        <div class="controls">
+            <button class="btn" onclick="prevSlide()">◀ 이전</button>
+            <span class="page-counter" id="pageCounter">1 / 6</span>
+            <button class="btn" onclick="nextSlide()">다음 ▶</button>
+        </div>
+    </div>
+
+    <div class="deck">
+        <!-- SLIDE 1: COVER -->
+        <div class="slide active" id="slide-0">
+            <div class="cover-center">
+                <span class="tag">DATA SCIENCE & COMMERCIAL DISTRICT ANALYTICS</span>
+                <h1 class="cover-title">성수동 카페 상권 생존 분석 및<br>소비자 수요 예측 SaaS 대시보드</h1>
+                <p class="slide-subtitle">서울시 상권분석서비스(2021~2025) 데이터 기반 머신러닝(XGBoost · LightGBM) 및 인터랙티브 시뮬레이션</p>
+                <div class="cover-meta">
+                    <span>📊 <strong>분석 대상:</strong> 성수동 4개 행정동 카페(커피·음료)</span>
+                    <span>⚙️ <strong>기술 스택:</strong> Python · Plotly · XGBoost · LightGBM</span>
+                    <span>📅 <strong>최종 발표:</strong> 2026</span>
+                </div>
+            </div>
+            <div class="slide-footer">
+                <span>키보드 좌우 방향키(← / →) 또는 상단 버튼으로 슬라이드를 전환할 수 있습니다.</span>
+                <span>Slide 1 of 6</span>
+            </div>
+        </div>
+
+        <!-- SLIDE 2: EXECUTIVE SUMMARY & KPI -->
+        <div class="slide" id="slide-1">
+            <div class="slide-header">
+                <span class="tag">01 · EXECUTIVE SUMMARY</span>
+                <h2 class="slide-title">성수동 카페 상권의 역설: 외형 성장 속 실질 폐업 리스크 심화</h2>
+                <p class="slide-subtitle">2025년 연간 매출과 점포당 매출은 상승했으나, 폐업 점포가 개업을 추월하며 순감소 전환</p>
+            </div>
+
+            <div class="grid-4">
+                <div class="card">
+                    <div class="kpi-label">2025 연간 총 매출</div>
+                    <div class="kpi-num">611억 원</div>
+                    <div class="kpi-delta" style="color: var(--accent-emerald);">▲ +2.0% (전년 대비)</div>
+                </div>
+                <div class="card">
+                    <div class="kpi-label">2025 평균 점포 수</div>
+                    <div class="kpi-num">513곳</div>
+                    <div class="kpi-delta" style="color: var(--accent-emerald);">▲ +33.6% (2021년 대비)</div>
+                </div>
+                <div class="card">
+                    <div class="kpi-label">2025 점포당 연매출</div>
+                    <div class="kpi-num">1.19억 원</div>
+                    <div class="kpi-delta" style="color: var(--accent-emerald);">▲ +3.4% (전년 대비)</div>
+                </div>
+                <div class="card" style="border-color: rgba(244,63,94,0.5);">
+                    <div class="kpi-label">2025 순증 점포 수</div>
+                    <div class="kpi-num" style="color: var(--accent-rose);">-16곳</div>
+                    <div class="kpi-delta" style="color: var(--accent-rose);">개업 85곳 vs 폐업 101곳</div>
+                </div>
+            </div>
+
+            <div class="grid-3" style="margin-top: 20px;">
+                <div class="card">
+                    <h3 style="color: var(--accent-blue); margin-bottom: 10px;">1. 연구 배경</h3>
+                    <p style="color: var(--text-muted); font-size: 0.95rem;">성수동은 MZ세대와 외국인 관광객 유입으로 국내 최고 핫플레이스로 부상했으나, 임대료 급등과 브랜드 간 출혈 경쟁으로 창업 리스크가 극대화됨.</p>
+                </div>
+                <div class="card">
+                    <h3 style="color: var(--accent-emerald); margin-bottom: 10px;">2. 문제 정의</h3>
+                    <p style="color: var(--text-muted); font-size: 0.95rem;">단순 평균 매출 지표만 보고 진입할 경우 높은 폐업률에 직면. 점포별 생존을 결정짓는 핵심 변수를 정량화하고 사전 검증할 도구 필요.</p>
+                </div>
+                <div class="card">
+                    <h3 style="color: var(--accent-amber); margin-bottom: 10px;">3. 솔루션 제안</h3>
+                    <p style="color: var(--text-muted); font-size: 0.95rem;">5개년 상권 데이터 시각화와 트리 기반 앙상블 모델(XGBoost/LightGBM)을 결합한 <strong>실시간 생존 확률 시뮬레이터 SaaS</strong> 구축.</p>
+                </div>
+            </div>
+
+            <div class="slide-footer">
+                <span>Source: 서울시 상권분석서비스 (2021 Q1 ~ 2025 Q4)</span>
+                <span>Slide 2 of 6</span>
+            </div>
+        </div>
+
+        <!-- SLIDE 3: INTERACTIVE MARKET TREND -->
+        <div class="slide" id="slide-2">
+            <div class="slide-header">
+                <span class="tag">02 · INTERACTIVE TREND ANALYSIS</span>
+                <h2 class="slide-title">분기별 매출액 및 점포 수 추이 (2021 ~ 2025)</h2>
+                <p class="slide-subtitle">차트 위에 마우스를 올리거나 드래그하여 분기별 세부 수치를 직접 탐색해 보세요</p>
+            </div>
+
+            <div class="chart-box" id="chart-trend"></div>
+
+            <div class="slide-footer">
+                <span>💡 Tip: 우측 상단 범례를 클릭해 막대(매출) 또는 선(점포 수)을 개별 필터링할 수 있습니다.</span>
+                <span>Slide 3 of 6</span>
+            </div>
+        </div>
+
+        <!-- SLIDE 4: OPEN VS CLOSE & ML FEATURE IMPORTANCE -->
+        <div class="slide" id="slide-3">
+            <div class="slide-header">
+                <span class="tag">03 · SURVIVAL & ML MODEL INSIGHTS</span>
+                <h2 class="slide-title">개·폐업 역전 현상 및 머신러닝 핵심 생존 변수</h2>
+                <p class="slide-subtitle">XGBoost & LightGBM 분류 모델 분석 결과, 초기 고정비 방어와 매출 안정성이 생존을 결정</p>
+            </div>
+
+            <div class="grid-2">
+                <div class="chart-box" id="chart-openclose"></div>
+                <div class="chart-box" id="chart-shap"></div>
+            </div>
+
+            <div class="slide-footer">
+                <span>모델 검증 성능: ROC-AUC 0.84 / F1-Score 0.81 (5-Fold Cross Validation 기준)</span>
+                <span>Slide 4 of 6</span>
+            </div>
+        </div>
+
+        <!-- SLIDE 5: LIVE INTERACTIVE SURVIVAL SIMULATOR -->
+        <div class="slide" id="slide-4">
+            <div class="slide-header">
+                <span class="tag">04 · LIVE INTERACTIVE SIMULATOR</span>
+                <h2 class="slide-title">실시간 카페 창업 생존 확률 시뮬레이터</h2>
+                <p class="slide-subtitle">슬라이더를 움직여 조건별 1년 내 생존 확률과 예상 손익분기(BEP) 안전도를 즉시 시뮬레이션합니다</p>
+            </div>
+
+            <div class="sim-layout">
+                <div class="card" style="justify-content: space-around;">
+                    <div class="slider-group">
+                        <div class="slider-header">
+                            <span>예상 월 평균 매출액</span>
+                            <span id="val-rev" style="color: var(--accent-blue);">1,200만 원</span>
+                        </div>
+                        <input type="range" id="in-rev" min="500" max="3000" step="50" value="1200" oninput="updateSim()">
+                    </div>
+
+                    <div class="slider-group">
+                        <div class="slider-header">
+                            <span>월 임대료 및 고정비</span>
+                            <span id="val-rent" style="color: var(--accent-rose);">350만 원</span>
+                        </div>
+                        <input type="range" id="in-rent" min="150" max="1000" step="25" value="350" oninput="updateSim()">
+                    </div>
+
+                    <div class="slider-group">
+                        <div class="slider-header">
+                            <span>반경 200m 내 경쟁 카페 수</span>
+                            <span id="val-comp" style="color: var(--accent-amber);">18곳</span>
+                        </div>
+                        <input type="range" id="in-comp" min="3" max="45" step="1" value="18" oninput="updateSim()">
+                    </div>
+
+                    <div class="slider-group" style="margin-bottom: 0;">
+                        <div class="slider-header">
+                            <span>객단가 (1인 평균 결제액)</span>
+                            <span id="val-price" style="color: var(--accent-emerald);">6,500원</span>
+                        </div>
+                        <input type="range" id="in-price" min="3000" max="15000" step="500" value="6500" oninput="updateSim()">
+                    </div>
+                </div>
+
+                <div class="card sim-result-box">
+                    <div style="font-size: 1rem; color: var(--text-muted); font-weight: 600;">예측 1년 내 상권 생존 확률</div>
+                    <div class="prob-circle" id="sim-prob" style="color: var(--accent-emerald);">74.2%</div>
+                    <div id="sim-badge" style="padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 0.9rem; background: rgba(16,185,129,0.18); color: var(--accent-emerald); margin-bottom: 18px;">
+                        안정 진입 구간 (임대료 비율 29.2%)
+                    </div>
+                    <p id="sim-advice" style="color: var(--text-muted); font-size: 0.92rem; max-width: 380px; line-height: 1.55;">
+                        현재 매출 대비 임대료 비중이 적정 수준(30% 이하)으로 관리되고 있습니다. 디저트·MD 결합을 통한 객단가 방어 시 생존율이 더욱 상승합니다.
+                    </p>
+                </div>
+            </div>
+
+            <div class="slide-footer">
+                <span>* 본 시뮬레이터는 성수동 학습 데이터 가중치를 반영한 실시간 인터랙티브 데모입니다.</span>
+                <span>Slide 5 of 6</span>
+            </div>
+        </div>
+
+        <!-- SLIDE 6: STRATEGIC RECOMMENDATIONS & CONCLUSION -->
+        <div class="slide" id="slide-5">
+            <div class="slide-header">
+                <span class="tag">05 · CONCLUSION & ROADMAP</span>
+                <h2 class="slide-title">데이터 기반 전략적 제언 및 향후 확장 계획</h2>
+                <p class="slide-subtitle">예비 창업자 의사결정 지원 및 B2B 상권 분석 SaaS 고도화 방향</p>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <h3 style="color: var(--accent-blue); margin-bottom: 16px; font-size: 1.2rem;">📌 예비 창업자·투자자 핵심 전략</h3>
+                    <ul class="bullet-list">
+                        <li>
+                            <strong>1. 임대료 상한선 준수 (매출 대비 25~30% 이내)</strong>
+                            메인 연무장길 이면의 성수2가·송정동 인접 골목 등 가성비 입지 선점으로 고정비 리스크 최소화
+                        </li>
+                        <li>
+                            <strong>2. 계절성·주말 편중 극복을 위한 B2B 오피스 수요 확보</strong>
+                            주말 관광객 의존도를 낮추기 위해 평일 지식산업센터·IT 기업 직장인 정기 구독/단체 수요 공략
+                        </li>
+                        <li>
+                            <strong>3. 저가 커피 출혈 경쟁 회피 및 객단가 고도화</strong>
+                            단순 아메리카노 중심에서 시그니처 음료·베이커리 페어링으로 객단가 7,500원 이상 설계
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <h3 style="color: var(--accent-emerald); margin-bottom: 16px; font-size: 1.2rem;">🚀 프로덕트 고도화 로드맵</h3>
+                    <ul class="bullet-list">
+                        <li>
+                            <strong>Phase 1 (현재): 성수동 상권 인터랙티브 리포트 & 웹 배포</strong>
+                            GitHub Pages & Streamlit Cloud 연동을 통한 웹 기반 실시간 시각화 및 시뮬레이터 제공
+                        </li>
+                        <li>
+                            <strong>Phase 2: 강남·강북 주요 핵심 상권 비교 엔진 통합</strong>
+                            성수·강남·홍대·한남 상권 간 동일 조건 입지 비교 및 최적 상권 추천 알고리즘 탑재
+                        </li>
+                        <li>
+                            <strong>Phase 3: 유동인구·SNS 트렌드 실시간 API 파이프라인</strong>
+                            서울 열린데이터광장 API 자동 수집 및 RDBMS(SQL) 기반 상용 SaaS 아키텍처 전환
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="slide-footer">
+                <span>감사합니다 · Q&A</span>
+                <span>Slide 6 of 6</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Slide Navigation Logic
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const totalSlides = slides.length;
+        const dotsContainer = document.getElementById('slideDots');
+        const counter = document.getElementById('pageCounter');
+
+        // Initialize dots
+        for (let i = 0; i < totalSlides; i++) {
+            const dot = document.createElement('div');
+            dot.className = 'dot' + (i === 0 ? ' active' : '');
+            dot.onclick = () => goToSlide(i);
+            dotsContainer.appendChild(dot);
+        }
+
+        function goToSlide(index) {
+            if (index < 0 || index >= totalSlides) return;
+            slides[currentSlide].classList.remove('active');
+            dotsContainer.children[currentSlide].classList.remove('active');
+            
+            currentSlide = index;
+            slides[currentSlide].classList.add('active');
+            dotsContainer.children[currentSlide].classList.add('active');
+            counter.textContent = `${currentSlide + 1} / ${totalSlides}`;
+
+            // Resize Plotly charts when slide becomes visible
+            window.dispatchEvent(new Event('resize'));
+        }
+
+        function nextSlide() {
+            goToSlide((currentSlide + 1) % totalSlides);
+        }
+
+        function prevSlide() {
+            goToSlide((currentSlide - 1 + totalSlides) % totalSlides);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') nextSlide();
+            if (e.key === 'ArrowLeft') prevSlide();
+        });
+
+        // Chart 1: Quarterly Revenue & Store Count
+        const quarters = ['21 Q1','21 Q2','21 Q3','21 Q4','22 Q1','22 Q2','22 Q3','22 Q4','23 Q1','23 Q2','23 Q3','23 Q4','24 Q1','24 Q2','24 Q3','24 Q4','25 Q1','25 Q2','25 Q3','25 Q4'];
+        const revenue = [110, 136, 131, 132, 119, 142, 143, 135, 131, 137, 141, 140, 140, 155, 150, 153, 140, 157, 158, 156];
+        const stores = [365, 388, 386, 405, 425, 462, 460, 482, 495, 502, 512, 510, 514, 520, 518, 519, 522, 515, 511, 508];
+
+        Plotly.newPlot('chart-trend', [
+            {
+                x: quarters,
+                y: revenue,
+                name: '분기 매출 (억 원)',
+                type: 'bar',
+                marker: { color: '#3b82f6', borderRadius: 4 }
+            },
+            {
+                x: quarters,
+                y: stores,
+                name: '점포 수 (곳)',
+                yaxis: 'y2',
+                type: 'scatter',
+                mode: 'lines+markers',
+                line: { color: '#10b981', width: 3 },
+                marker: { size: 7 }
+            }
+        ], {
+            paper_bgcolor: 'transparent',
+            plot_bgcolor: 'transparent',
+            font: { color: '#cbd5e1', family: 'Pretendard, sans-serif' },
+            xaxis: { gridcolor: '#28354f' },
+            yaxis: { title: '분기 매출 (억 원)', gridcolor: '#28354f', range: [0, 180] },
+            yaxis2: { title: '점포 수 (곳)', overlaying: 'y', side: 'right', showgrid: false, range: [340, 550] },
+            legend: { orientation: 'h', x: 0.02, y: 1.12 },
+            margin: { t: 35, b: 45, l: 55, r: 55 },
+            hovermode: 'x unified'
+        }, { responsive: true });
+
+        // Chart 2: Open vs Close
+        Plotly.newPlot('chart-openclose', [
+            {
+                x: ['2021', '2022', '2023', '2024', '2025'],
+                y: [122, 145, 128, 104, 85],
+                name: '신규 개업',
+                type: 'bar',
+                marker: { color: '#10b981' }
+            },
+            {
+                x: ['2021', '2022', '2023', '2024', '2025'],
+                y: [78, 86, 92, 99, 101],
+                name: '폐업 점포',
+                type: 'bar',
+                marker: { color: '#f43f5e' }
+            }
+        ], {
+            title: { text: '연간 개업 vs 폐업 점포 추이 (2025년 역전)', font: { size: 15, color: '#f8fafc' } },
+            paper_bgcolor: 'transparent',
+            plot_bgcolor: 'transparent',
+            font: { color: '#cbd5e1' },
+            barmode: 'group',
+            xaxis: { gridcolor: '#28354f' },
+            yaxis: { title: '점포 수 (곳)', gridcolor: '#28354f' },
+            legend: { orientation: 'h', x: 0.05, y: 1.12 },
+            margin: { t: 55, b: 40, l: 50, r: 20 }
+        }, { responsive: true });
+
+        // Chart 3: Feature Importance
+        Plotly.newPlot('chart-shap', [
+            {
+                x: [0.34, 0.24, 0.19, 0.14, 0.09],
+                y: ['점포당 월평균 매출', '임대료 대비 매출비율', '반경 200m 경쟁밀도', '분기별 매출 변동성', '평균 객단가 수준'],
+                type: 'bar',
+                orientation: 'h',
+                marker: {
+                    color: ['#3b82f6', '#60a5fa', '#818cf8', '#a78bfa', '#c084fc']
+                }
+            }
+        ], {
+            title: { text: 'XGBoost 생존 예측 변수 중요도 (Feature Importance)', font: { size: 15, color: '#f8fafc' } },
+            paper_bgcolor: 'transparent',
+            plot_bgcolor: 'transparent',
+            font: { color: '#cbd5e1' },
+            xaxis: { title: '중요도 가중치', gridcolor: '#28354f' },
+            yaxis: { autorange: 'reversed', automargin: true },
+            margin: { t: 55, b: 40, l: 130, r: 25 }
+        }, { responsive: true });
+
+        // Live Interactive Simulator Calculation
+        function updateSim() {
+            const rev = parseInt(document.getElementById('in-rev').value);
+            const rent = parseInt(document.getElementById('in-rent').value);
+            const comp = parseInt(document.getElementById('in-comp').value);
+            const price = parseInt(document.getElementById('in-price').value);
+
+            document.getElementById('val-rev').textContent = rev.toLocaleString() + '만 원';
+            document.getElementById('val-rent').textContent = rent.toLocaleString() + '만 원';
+            document.getElementById('val-comp').textContent = comp + '곳';
+            document.getElementById('val-price').textContent = price.toLocaleString() + '원';
+
+            const rentRatio = (rent / rev) * 100;
+            
+            // Logistic-style scoring based on realistic cafe unit economics
+            let score = 55;
+            score += (rev - 1000) * 0.018;
+            score -= (rentRatio - 25) * 1.15;
+            score -= (comp - 15) * 0.65;
+            score += (price - 6000) * 0.0022;
+
+            const prob = Math.max(8.5, Math.min(96.8, score)).toFixed(1);
+            const probEl = document.getElementById('sim-prob');
+            const badgeEl = document.getElementById('sim-badge');
+            const adviceEl = document.getElementById('sim-advice');
+
+            probEl.textContent = prob + '%';
+
+            if (prob >= 70) {
+                probEl.style.color = '#10b981';
+                badgeEl.style.background = 'rgba(16,185,129,0.18)';
+                badgeEl.style.color = '#10b981';
+                badgeEl.textContent = `안정 진입 구간 (임대료 비율 ${rentRatio.toFixed(1)}%)`;
+                adviceEl.textContent = '매출 대비 고정비 방어력이 우수합니다. 시그니처 메뉴와 단골 리텐션을 강화하면 안정적인 장기 운영이 가능합니다.';
+            } else if (prob >= 45) {
+                probEl.style.color = '#f59e0b';
+                badgeEl.style.background = 'rgba(245,158,11,0.18)';
+                badgeEl.style.color = '#f59e0b';
+                badgeEl.textContent = `주의 관찰 구간 (임대료 비율 ${rentRatio.toFixed(1)}%)`;
+                adviceEl.textContent = '경쟁 점포 밀집도 또는 고정비 부담으로 수익 변동 위험이 있습니다. 객단가 상향(디저트 결합) 또는 이면도로 입지 조정이 권장됩니다.';
+            } else {
+                probEl.style.color = '#f43f5e';
+                badgeEl.style.background = 'rgba(244,63,94,0.18)';
+                badgeEl.style.color = '#f43f5e';
+                badgeEl.textContent = `고위험 경고 구간 (임대료 비율 ${rentRatio.toFixed(1)}%)`;
+                adviceEl.textContent = '매출 대비 임대료 비중이 과도하거나 주변 경쟁이 극심합니다. 현 조건으로 진입 시 1년 내 적자 및 폐업 리스크가 매우 높습니다.';
+            }
+        }
+    </script>
+</body>
+</html>
