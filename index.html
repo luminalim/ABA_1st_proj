@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>성수동 카페 인터랙티브 대시보드</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{color-scheme:light;--bg:#F6F3EC;--card:#FFFDF8;--ink:#1E2B26;--muted:#5C6660;--line:#E3DDD0;--coffee:#8A5A34;--sage:#5F7D6B;--red:#B5533C;--grey:#9AA39E}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#141a18;--card:#1d2522;--ink:#EDE8DC;--muted:#A5ADA7;--line:#33403b;--coffee:#D9A36E;--sage:#8DB39C;--red:#E08A74;--grey:#6F7973}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#141a18;--card:#1d2522;--ink:#EDE8DC;--muted:#A5ADA7;--line:#33403b;--coffee:#D9A36E;--sage:#8DB39C;--red:#E08A74;--grey:#6F7973}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans KR",Arial,"Malgun Gothic",sans-serif;font-size:14px;line-height:1.5}
+.wrap{max-width:1200px;margin:0 auto;padding:calc(18px + env(safe-area-inset-top,0px)) 16px calc(32px + env(safe-area-inset-bottom,0px))}
+header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+h1{font-size:22px;margin:0 0 4px}
+.sub{color:var(--muted);font-size:12px}
+button.ghost{background:none;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:6px 12px;cursor:pointer;font:inherit;font-size:12px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:16px 0}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.kpi .l{color:var(--muted);font-size:12px}.kpi .v{font-size:22px;font-weight:700;margin-top:4px;color:var(--coffee)}.kpi .d{font-size:12px;margin-top:2px;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;min-width:0}
+.card.wide{grid-column:1/-1}
+.card h2{font-size:15px;margin:0 0 2px}
+.hint{color:var(--muted);font-size:12px;margin-bottom:10px}
+.ctrl{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-bottom:10px;font-size:13px}
+.ctrl select,.ctrl input[type=range]{font:inherit;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:4px 8px}
+.ctrl label{display:inline-flex;align-items:center;gap:4px;cursor:pointer}
+.chart{position:relative;height:300px}
+.chart.tall{height:340px}
+.val{font-weight:700;color:var(--coffee);min-width:64px;display:inline-block}
+.note{color:var(--muted);font-size:12px;margin-top:14px;line-height:1.7}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}th{color:var(--muted);font-weight:600}
+.tbl-wrap{overflow-x:auto}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <h1>성수동 카페 인터랙티브 대시보드</h1>
+    <div class="sub">서울시 상권분석서비스 2021~2025 · 4개 행정동 합계 · 매출은 카드 결제 기준 추정치</div>
+  </div>
+  <button class="ghost" id="themeBtn" type="button">화면 전환</button>
+</header>
+
+<div class="kpis" id="kpis"></div>
+
+<div class="grid">
+  <div class="card wide">
+    <h2>분기 추이 탐색</h2>
+    <div class="hint">지표와 기간을 골라 보세요. 범례를 누르면 해당 선이 숨겨집니다.</div>
+    <div class="ctrl">
+      <label>지표
+        <select id="metric">
+          <option value="sales">분기 매출 (억 원)</option>
+          <option value="stores">점포 수 (곳)</option>
+          <option value="perstore">점포당 분기 매출 (만 원)</option>
+        </select>
+      </label>
+      <label>시작
+        <select id="startQ"></select>
+      </label>
+      <label>끝
+        <select id="endQ"></select>
+      </label>
+      <span class="sub" id="rangeInfo"></span>
+    </div>
+    <div class="chart tall"><canvas id="cMain"></canvas></div>
+  </div>
+
+  <div class="card">
+    <h2>행정동별 분기 매출</h2>
+    <div class="hint">체크한 동만 쌓아서 봅니다 (억 원)</div>
+    <div class="ctrl" id="dongChecks"></div>
+    <div class="chart"><canvas id="cDong"></canvas></div>
+  </div>
+
+  <div class="card">
+    <h2>연간 개업 vs 폐업</h2>
+    <div class="hint">2025년 폐업이 개업보다 16곳 많음</div>
+    <div class="chart"><canvas id="cOC"></canvas></div>
+  </div>
+
+  <div class="card">
+    <h2>2025년 백테스트: 예측 vs 실제</h2>
+    <div class="hint">2021~2024 학습 후 2025년 분기 매출 비교 (억 원)</div>
+    <div class="chart"><canvas id="cBack"></canvas></div>
+  </div>
+
+  <div class="card">
+    <h2>유동인구 추이 (4개 동 합계)</h2>
+    <div class="hint">2021 Q1 ~ 2026 Q1 (명)</div>
+    <div class="chart"><canvas id="cPop"></canvas></div>
+  </div>
+
+  <div class="card wide">
+    <h2>2031년까지 매출 시나리오 시뮬레이터</h2>
+    <div class="hint">점포 수와 점포당 매출 증가율을 바꾸면 매출이 바로 다시 계산됩니다. 기본값은 발표 시나리오와 같습니다.</div>
+    <div class="ctrl">
+      <label>연간 점포 수 증감률 <input type="range" id="stG" min="-5" max="5" step="0.5" value="0"> <span class="val" id="stGv"></span></label>
+      <label>연간 점포당 매출 증가율 <input type="range" id="psG" min="-5" max="8" step="0.1" value="3.4"> <span class="val" id="psGv"></span></label>
+    </div>
+    <div class="grid" style="grid-template-columns:2fr 1fr;gap:14px">
+      <div class="chart tall"><canvas id="cScen"></canvas></div>
+      <div class="tbl-wrap"><table id="scenTbl"></table></div>
+    </div>
+  </div>
+</div>
+
+<div class="note">
+  점포 수는 상권분석 기준(커피-음료 업종, 분기 말)이며 인허가 기준 영업중 카페 수(227곳)와 정의가 다릅니다.
+  추정매출은 카드 결제 기준 추정치입니다. 2031년 시나리오는 적합 모델이 아니라 가정 기반 구조 시나리오이므로 범위로 해석합니다.
+  2026년 1분기 이후 매출·점포 자료는 반영되지 않았습니다.
+</div>
+</div>
+
+<script>
+const D = {"q": ["2021 Q1", "2021 Q2", "2021 Q3", "2021 Q4", "2022 Q1", "2022 Q2", "2022 Q3", "2022 Q4", "2023 Q1", "2023 Q2", "2023 Q3", "2023 Q4", "2024 Q1", "2024 Q2", "2024 Q3", "2024 Q4", "2025 Q1", "2025 Q2", "2025 Q3", "2025 Q4"], "stores": [363, 383, 386, 403, 423, 454, 451, 482, 499, 502, 512, 511, 514, 523, 522, 520, 523, 514, 508, 506], "open": [22, 45, 22, 34, 31, 39, 24, 52, 34, 30, 37, 28, 29, 30, 25, 21, 22, 22, 23, 18], "close": [12, 26, 17, 14, 11, 8, 24, 23, 18, 26, 25, 24, 24, 22, 27, 27, 18, 32, 22, 29], "sales": [110.0, 136.38, 131.6, 132.03, 119.83, 142.81, 142.83, 135.15, 130.94, 137.99, 141.64, 140.59, 139.43, 155.81, 150.71, 153.18, 141.09, 157.34, 157.84, 154.96], "perstore": [3030.3, 3560.9, 3409.3, 3276.3, 2832.8, 3145.7, 3167.0, 2803.9, 2624.0, 2748.8, 2766.4, 2751.2, 2712.6, 2979.2, 2887.1, 2945.8, 2697.8, 3061.2, 3107.0, 3062.5], "dong": {"성수1가1동": [5.0, 8.49, 6.83, 6.9, 6.63, 10.81, 9.05, 7.93, 7.39, 9.73, 10.52, 10.2, 9.06, 13.34, 10.85, 11.23, 9.08, 14.92, 9.94, 9.2], "성수1가2동": [44.7, 54.93, 52.03, 52.47, 46.16, 54.82, 56.91, 55.31, 54.15, 60.47, 64.91, 63.6, 63.7, 65.31, 61.79, 62.71, 57.11, 60.26, 58.91, 56.29], "성수2가1동": [24.8, 26.82, 30.05, 29.18, 28.85, 32.3, 32.91, 30.31, 28.31, 24.51, 24.58, 22.06, 21.86, 29.14, 29.03, 29.85, 27.82, 31.24, 31.42, 29.74], "성수2가3동": [35.5, 46.14, 42.68, 43.48, 38.18, 44.88, 43.96, 41.6, 41.1, 43.28, 41.64, 44.72, 44.8, 48.02, 49.03, 49.39, 47.08, 50.91, 57.57, 59.73]}, "pop": [20024613, 20732168, 19435034, 19783869, 19367372, 20018434, 19448387, 19377505, 19610860, 19380546, 18985505, 19437960, 19562612, 19518726, 19033200, 19554992, 19330308, 19445942, 19337055, 19415701, 19691386], "pop_q": ["2021 Q1", "2021 Q2", "2021 Q3", "2021 Q4", "2022 Q1", "2022 Q2", "2022 Q3", "2022 Q4", "2023 Q1", "2023 Q2", "2023 Q3", "2023 Q4", "2024 Q1", "2024 Q2", "2024 Q3", "2024 Q4", "2025 Q1", "2025 Q2", "2025 Q3", "2025 Q4", "2026 Q1"], "base_stores": 512.75, "base_ps": 11920.7, "ps_g_default": 3.41, "back": {"actual": [141.1, 157.3, 157.8, 155.0], "trend": [141.6, 162.6, 160.9, 159.1], "naive": [149.8, 149.8, 149.8, 149.8]}};
+const root = document.documentElement;
+document.getElementById('themeBtn').addEventListener('click', () => {
+  const dark = root.getAttribute('data-theme') === 'dark' || (!root.getAttribute('data-theme') && matchMedia('(prefers-color-scheme: dark)').matches);
+  root.setAttribute('data-theme', dark ? 'light' : 'dark');
+  Object.values(Chart.instances).forEach(c => { applyTheme(c); c.update(); });
+});
+const css = n => getComputedStyle(root).getPropertyValue(n).trim();
+function applyTheme(c){
+  const ink = css('--muted'), line = css('--line');
+  c.options.color = ink;
+  ['x','y','y1'].forEach(k => { if (c.options.scales && c.options.scales[k]) { c.options.scales[k].ticks = {...c.options.scales[k].ticks, color: ink}; if (c.options.scales[k].grid) c.options.scales[k].grid.color = line; } });
+  if (c.options.plugins && c.options.plugins.legend) c.options.plugins.legend.labels = {...(c.options.plugins.legend.labels||{}), color: css('--ink')};
+}
+Chart.defaults.font.family = '"Noto Sans KR", Arial, sans-serif';
+const fmt = (n, d=0) => Number(n).toLocaleString('ko-KR', {maximumFractionDigits: d, minimumFractionDigits: d});
+const pct = (a,b) => ((a/b-1)*100 >= 0 ? '+' : '') + ((a/b-1)*100).toFixed(1) + '%';
+function scaleOpts(title){ return { x:{grid:{display:false}, ticks:{color:css('--muted'), maxRotation:60, autoSkip:true}}, y:{title:{display:!!title,text:title,color:css('--muted')}, grid:{color:css('--line')}, ticks:{color:css('--muted')}} }; }
+function legendOpts(){ return {position:'bottom', labels:{color:css('--ink'), boxWidth:12}}; }
+
+// KPI
+const n = 19, yr25 = D.sales.slice(16,20).reduce((a,b)=>a+b,0), yr24 = D.sales.slice(12,16).reduce((a,b)=>a+b,0);
+const ps25 = yr25*10000/ (D.stores.slice(16,20).reduce((a,b)=>a+b,0)/4), ps24 = yr24*10000/(D.stores.slice(12,16).reduce((a,b)=>a+b,0)/4);
+const net25 = D.open.slice(16,20).reduce((a,b)=>a+b,0) - D.close.slice(16,20).reduce((a,b)=>a+b,0);
+document.getElementById('kpis').innerHTML = [
+  {l:'2025 연 매출', v: fmt(yr25,0)+'억 원', d: pct(yr25,yr24)+' 전년 대비'},
+  {l:'2025 평균 점포 수', v: fmt(D.stores.slice(16,20).reduce((a,b)=>a+b,0)/4,0)+'곳', d:'2025 Q4 기준 '+D.stores[19]+'곳'},
+  {l:'2025 점포당 연매출', v: (ps25/10000).toFixed(2)+'억 원', d: pct(ps25,ps24)+' 전년 대비'},
+  {l:'2025 순증 점포', v: (net25>0?'+':'')+net25+'곳', d:'개업 '+D.open.slice(16,20).reduce((a,b)=>a+b,0)+' · 폐업 '+D.close.slice(16,20).reduce((a,b)=>a+b,0)}
+].map(k=>`<div class="kpi"><div class="l">${k.l}</div><div class="v">${k.v}</div><div class="d">${k.d}</div></div>`).join('');
+
+// 분기 추이 (지표/기간 선택)
+const sQ = document.getElementById('startQ'), eQ = document.getElementById('endQ'), mSel = document.getElementById('metric');
+D.q.forEach((q,i)=>{ sQ.add(new Option(q,i)); eQ.add(new Option(q,i)); });
+sQ.value = 0; eQ.value = D.q.length-1;
+const metricInfo = {sales:{label:'분기 매출 (억 원)', color:css('--coffee'), type:'bar', data:D.sales, d:1}, stores:{label:'점포 수 (곳)', color:css('--sage'), type:'line', data:D.stores, d:0}, perstore:{label:'점포당 분기 매출 (만 원)', color:css('--red'), type:'line', data:D.perstore, d:0}};
+const cMain = new Chart(document.getElementById('cMain'), {type:'bar', data:{labels:[],datasets:[{data:[]}]}, options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},scales:scaleOpts(''),plugins:{legend:{display:false}}}});
+function updateMain(){
+  const m = metricInfo[mSel.value], a = +sQ.value, b = +eQ.value;
+  const labels = D.q.slice(a,b+1), vals = m.data.slice(a,b+1);
+  cMain.config.type = m.type;
+  cMain.data = {labels, datasets:[{label:m.label, data:vals, backgroundColor:m.color+'CC', borderColor:m.color, borderWidth:2, tension:.25, pointRadius:3, fill:false}]};
+  cMain.options.plugins.legend = {display:true, position:'bottom', labels:{color:css('--ink')}};
+  cMain.options.scales = scaleOpts(m.label);
+  cMain.update();
+  document.getElementById('rangeInfo').textContent = `${labels[0]} ~ ${labels[labels.length-1]} · 평균 ${fmt(vals.reduce((x,y)=>x+y,0)/vals.length, m.d)}`;
+}
+[mSel,sQ,eQ].forEach(el => el.addEventListener('change', updateMain));
+
+// 동별 (체크박스)
+const dongColors = [css('--coffee'), css('--sage'), css('--red'), '#4C72B0'];
+const dongBox = document.getElementById('dongChecks');
+Object.keys(D.dong).forEach((nm,i)=>{ dongBox.insertAdjacentHTML('beforeend', `<label><input type="checkbox" checked data-i="${i}"> ${nm}</label>`); });
+const cDong = new Chart(document.getElementById('cDong'), {type:'bar', data:{labels:D.q, datasets:[]}, options:{responsive:true,maintainAspectRatio:false,scales:{...scaleOpts('억 원'), x:{stacked:true, grid:{display:false}, ticks:{color:css('--muted'),maxRotation:60,autoSkip:true}}, y:{stacked:true, grid:{color:css('--line')}, ticks:{color:css('--muted')}, title:{display:true,text:'억 원',color:css('--muted')}}}, plugins:{legend:legendOpts()}}});
+function updateDong(){
+  const checked = [...dongBox.querySelectorAll('input')].filter(x=>x.checked).map(x=>+x.dataset.i);
+  const names = Object.keys(D.dong);
+  cDong.data.datasets = checked.map(i => ({label:names[i], data:D.dong[names[i]], backgroundColor:dongColors[i], borderRadius:2}));
+  cDong.update();
+}
+dongBox.addEventListener('change', updateDong);
+
+// 연간 개폐업
+const yrs = ['2021','2022','2023','2024','2025'];
+const annOpen = yrs.map((y,i)=>D.open.slice(i*4,i*4+4).reduce((a,b)=>a+b,0));
+const annClose = yrs.map((y,i)=>D.close.slice(i*4,i*4+4).reduce((a,b)=>a+b,0));
+new Chart(document.getElementById('cOC'), {type:'bar', data:{labels:yrs.map(y=>y+'년'), datasets:[{label:'개업', data:annOpen, backgroundColor:css('--sage')}, {label:'폐업', data:annClose, backgroundColor:css('--red')}]}, options:{responsive:true,maintainAspectRatio:false,scales:scaleOpts(''),plugins:{legend:legendOpts()}}});
+
+// 백테스트
+new Chart(document.getElementById('cBack'), {type:'bar', data:{labels:['Q1','Q2','Q3','Q4'], datasets:[{label:'실제', data:D.back.actual, backgroundColor:css('--ink')}, {label:'추세·구조 모델', data:D.back.trend, backgroundColor:css('--coffee')}, {label:'단순 기준선', data:D.back.naive, backgroundColor:css('--grey')}]}, options:{responsive:true,maintainAspectRatio:false,scales:{...scaleOpts('억 원'), y:{min:120, grid:{color:css('--line')}, ticks:{color:css('--muted')}, title:{display:true,text:'억 원',color:css('--muted')}}}, plugins:{legend:legendOpts()}}});
+
+// 유동인구
+new Chart(document.getElementById('cPop'), {type:'line', data:{labels:D.pop_q, datasets:[{label:'유동인구 (명)', data:D.pop, borderColor:css('--coffee'), backgroundColor:css('--coffee'), tension:.25, pointRadius:2}]}, options:{responsive:true,maintainAspectRatio:false,scales:scaleOpts('명'),plugins:{legend:{display:false}}}});
+
+// 시나리오
+const stG = document.getElementById('stG'), psG = document.getElementById('psG');
+const cScen = new Chart(document.getElementById('cScen'), {type:'line', data:{labels:[], datasets:[]}, options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},scales:scaleOpts('연 매출 (억 원)'),plugins:{legend:legendOpts()}}});
+function scen(sg, pg){
+  const rows=[]; let s=D.base_stores, p=D.base_ps; rows.push({y:'2025 실적', st:s, ps:p, v:s*p/10000});
+  for(let y=2026;y<=2031;y++){ s*=1+sg; p*=1+pg; rows.push({y:String(y), st:s, ps:p, v:s*p/10000}); }
+  return rows;
+}
+function updateScen(){
+  const sg = +stG.value/100, pg = +psG.value/100;
+  document.getElementById('stGv').textContent = (+stG.value>0?'+':'')+stG.value+'%';
+  document.getElementById('psGv').textContent = (+psG.value>0?'+':'')+psG.value+'%';
+  const user = scen(sg,pg), base = scen(0, D.ps_g_default/100), down = scen(-0.01, 0);
+  cScen.data = {labels: user.map(r=>r.y), datasets:[
+    {label:'사용자 설정', data:user.map(r=>r.v), borderColor:css('--coffee'), backgroundColor:css('--coffee'), borderWidth:3, tension:.25, pointRadius:3},
+    {label:'기준 (발표 시나리오)', data:base.map(r=>r.v), borderColor:css('--sage'), backgroundColor:css('--sage'), borderDash:[4,3], tension:.25, pointRadius:2},
+    {label:'하방 (발표 시나리오)', data:down.map(r=>r.v), borderColor:css('--red'), backgroundColor:css('--red'), borderDash:[6,4], tension:.25, pointRadius:2}
+  ]};
+  cScen.update();
+  document.getElementById('scenTbl').innerHTML = '<thead><tr><th>연도</th><th>점포 수</th><th>점포당(억)</th><th>매출(억)</th></tr></thead><tbody>' +
+    user.map(r=>`<tr><td>${r.y}</td><td>${fmt(r.st,0)}</td><td>${(r.ps/10000).toFixed(2)}</td><td>${fmt(r.v,0)}</td></tr>`).join('') + '</tbody>';
+}
+[stG,psG].forEach(el => el.addEventListener('input', updateScen));
+
+updateMain(); updateDong(); updateScen();
+</script>
+</body>
+</html>

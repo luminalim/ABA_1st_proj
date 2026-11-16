@@ -1,0 +1,6 @@
+# 공공데이터 원본 (파일 크기 및 재배포 조건 때문에 제외)
+원본데이터/
+04_원본데이터/
+*.zip
+__pycache__/
+.streamlit/secrets.toml
